@@ -33,28 +33,28 @@ class DataTransformation():
     def get_runtime(self, Pelicula):
         runtime = self.data.loc[self.data["title"] == Pelicula]["runtime"][1]
         year_released = self.data.loc[self.data["title"] == Pelicula]["release_year"][1]
-        return f"{Pelicula}. Duración: {runtime} min. Año: {year_released}"
+        return {"Pelicula": Pelicula, "Duración": runtime, "Año": year_released}
     
     def get_movies_by_language(self, Idioma):
         movie_qty = len(self.data.loc[self.data["original_language"] == Idioma].index)
-        return f"{movie_qty} películas fueron estrenadas en idioma {Idioma}"
+        return {"Idioma": Idioma, "Cantidad_Peliculas": movie_qty}
     
     def get_movies_by_collection(self, Franquicia):
         movie_qty = len(self.data.loc[self.data["belongs_to_collection"] == Franquicia].index)
         total_revenue = self.data.loc[self.data["belongs_to_collection"] == Franquicia]["revenue"].sum()
         avg_revenue = self.data.loc[self.data["belongs_to_collection"] == Franquicia]["revenue"].mean()
-        return f"La franquicia {Franquicia} posee {movie_qty} peliculas, una ganancia total de {total_revenue} y una ganancia promedio de {avg_revenue}."
+        return {"Franquicia": Franquicia, "Cantidad_Peliculas": movie_qty, "Ganancia total": total_revenue, "Ganancia promedio": avg_revenue}
     
     def get_movies_by_country(self, Pais):
         self.data["is_country_in"] = self.data["production_countries"].apply(lambda x: sum([1 for n in x if n["name"] == Pais]))
         movie_qty = self.data["is_country_in"].sum()
-        return f"Se produjeron {movie_qty} películas en el país {Pais}"
+        return {"País": Pais, "Cantidad_Peliculas": movie_qty}
     
     def get_movies_by_company(self, Productora):
         self.data["is_company_in"] = self.data["production_companies"].apply(lambda x: sum([1 for n in x if n["name"] == Productora]))
         movie_qty = self.data["is_company_in"].sum()
         total_revenue = self.data.loc[self.data["is_company_in"] == 1]["revenue"].sum()
-        return f"La productora {Productora} ha tenido un revenue de {total_revenue}, con un total de {movie_qty} películas."
+        return {"Productora": Productora, "Ganancia": total_revenue, "Cantidad_Peliculas": movie_qty}
 
     def get_movies_by_director(self, Director):
         # Eliminamos filas con datos nulos y listas vacías.
@@ -68,4 +68,4 @@ class DataTransformation():
         # Obtenemos la lista de películas con la fecha de lanzamiento, retorno individual, costo y ganancia.
         data_draft = self.data_merge.loc[self.data_merge["is_director_in"] == 1]
         movie_list = [{"title": data["title"], "release_date": pd.to_datetime(data["release_date"]).strftime("%Y/%m/%d"), "budget": data["budget"], "revenue": data["revenue"], "return": round(data["return"],2)} for (index, data) in data_draft.iterrows()]
-        return f"Message: {Director} ha participado como director en {movie_qty} películas. Con un retorno de {round(total_return,2)}. \n {movie_list}"
+        return {"Director": Director, "Cantidad_Peliculas": movie_qty, "Retorno": round(total_return,2), "Listado_peliculas": movie_list}
