@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends
 from data_source import DataTransformation
-from typing import Annotated, Any
+from typing_extensions import Annotated, Any
 
 app = FastAPI()
 
