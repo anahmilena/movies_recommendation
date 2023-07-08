@@ -15,7 +15,7 @@ class DataTransformation():
     def transform(self):
         self.data = self.data[self.data["adult"].isin(["True", "False"])]
         self.data.drop(columns=["video", "imdb_id", "adult", "original_title", "poster_path", "homepage"], inplace=True)
-        self.data.dropna(subset="release_date", inplace=True)
+        self.data.dropna(subset=["release_date"], inplace=True)
         self.data["revenue"] = self.data["revenue"].fillna(0)
         self.data["budget"] = self.data["budget"].fillna(0)
         self.data["budget"] = self.data["budget"].apply(pd.to_numeric)
