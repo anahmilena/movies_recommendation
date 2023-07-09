@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import datetime as dt
+import json
 import ast
 from fastapi import FastAPI, Depends
 
@@ -85,11 +86,11 @@ def get_director(Director: str):
     data_merge.drop(data_merge[data_merge["crew"].isnull()].index, inplace=True)
     data_merge.drop(data_merge[data_merge['crew'].apply(len) == 0].index, inplace=True)
     # Creamos una columna nueva con un indicador de si se participó como director en dicha película.
-    data_merge["is_director_in"] = data_merge["crew"].apply(lambda x: np.count_nonzero([1 for n in x if (n["job"] == "Director") and (n["name"] == Director)]))
+    data_merge["is_director_in"] = data_merge["crew"].apply(lambda x: sum([1 for n in x if (n["job"] == "Director") and (n["name"] == Director)]))
     # Calculamos cantidad de películas en las que participó y retorno general.
-    movie_qty = data_merge["is_director_in"].sum()
+    movie_qty = sum(data_merge["is_director_in"])
     total_return = data_merge.loc[data_merge["is_director_in"] == 1]["revenue"].sum() / data_merge.loc[data_merge["is_director_in"] == 1]["budget"].sum()
     # Obtenemos la lista de películas con la fecha de lanzamiento, retorno individual, costo y ganancia.
     data_draft = data_merge.loc[data_merge["is_director_in"] == 1]
     movie_list = [{"title": data["title"], "release_date": pd.to_datetime(data["release_date"]).strftime("%Y/%m/%d"), "budget": data["budget"], "revenue": data["revenue"], "return": round(data["return"],2)} for (index, data) in data_draft.iterrows()]
-    return {"Director": Director, "Cantidad_Peliculas": movie_qty, "Retorno": round(total_return,2), "Listado_peliculas": movie_list}
+    return {"Director": Director, "Cantidad_Peliculas": movie_qty, "Retorno": round(float(total_return),2), "Listado_peliculas": movie_list}
