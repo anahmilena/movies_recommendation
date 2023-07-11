@@ -2,11 +2,49 @@ import numpy as np
 import pandas as pd
 import datetime as dt
 import ast
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI
+import string
+import nltk
+from nltk.corpus import stopwords
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+# Creamos una función para filtrar del texto que ingresemos los signos de puntuación y los stopwords, y para pasar todo a minúsculas.
+nltk.download('stopwords') # Descargamos el conjunto de stopwords en inglés
+nltk.download('punkt') # Descargamos los datos requeridos para el tokenizador de oraciones en inglés
+stop_words = set(stopwords.words('english'))  # Creamos un set de stopwords en inglés
+
+def transform_sentence(sentence):
+    sentence_new = sentence.translate(str.maketrans("", "", string.punctuation)).lower() # Remove punctuation and convert to lowercase
+
+    words = nltk.word_tokenize(sentence_new) # Utilizamos este método para dividir la oración en palabras individuales
+    filtered_sentence = " ".join([word for word in words if word.lower() not in stop_words]) # Utilizamos list comprehension para filtrar las palabras de la lista words y lo regresamos a string
+
+    return filtered_sentence
+#---------------------------------------------------------------------
 
 DATASET = "Dataset/data_merge.csv"
 
 data = pd.read_csv(DATASET)
+
+# Reducimos el número de registros para evitar que se muera el computador
+data_reduced = data[data["vote_count"] > 50]
+data_reduced = data_reduced[data_reduced["vote_average"] > 5]
+data_reduced.dropna(subset=["overview", "title"], inplace=True)
+#----------------------------------------------------------------------
+
+# Aplicamos la función de filtrado de texto a overview y title y las concateno en una sola columna.
+data_reduced["overview_main_words"] = data_reduced["overview"].apply(lambda x: transform_sentence(x) if pd.notnull(x) else np.nan)
+data_reduced["title_main_words"] = data_reduced["title"].apply(lambda x: transform_sentence(x) if pd.notnull(x) else np.nan)
+data_reduced["main_words_for_rs"] = data_reduced["title_main_words"] + " " + data_reduced["overview_main_words"]
+data_reduced.drop(columns=["overview_main_words", "title_main_words"], inplace=True)
+#----------------------------------------------------------------------
+
+# Creamos TF-IDF vectors y calculamos similaridad con Cosine Similarity
+vectorizer = TfidfVectorizer()
+tfidf_matrix = vectorizer.fit_transform(data_reduced["main_words_for_rs"])
+similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
+#----------------------------------------------------------------------
 
 app = FastAPI()
 
@@ -74,3 +112,11 @@ def get_director(Director: str):
     data_draft = data_draft.loc[data_draft["is_director_in"] == 1]
     movie_list = [{"title": data["title"], "release_date": pd.to_datetime(data["release_date"]).strftime("%Y/%m/%d"), "budget": data["budget"], "revenue": data["revenue"], "return": round(data["return"],2)} for (index, data) in data_draft.iterrows()]
     return {"Director": Director, "Cantidad_Peliculas": movie_qty, "Retorno": round(float(total_return),2), "Listado_peliculas": movie_list}
+
+@app.get("/recommendation/{titulo}")
+def recomendacion(titulo: str): 
+# Se ingresa el nombre de una película y te recomienda las similares en una lista de 5 valores.
+    index_id = data_reduced[data_reduced["title"] == titulo].index[0]  # Index of the movie you want to find similar movies for
+    similar_movies_indices = similarity_matrix[index_id].argsort()[::-1][1:6]  # Exclude the movie itself, take top 10
+    similar_movies = data_reduced.iloc[similar_movies_indices][['title']].to_dict(orient='list')
+    return similar_movies
