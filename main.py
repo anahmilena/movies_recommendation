@@ -7,7 +7,7 @@ import string
 import nltk
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.neighbors import NearestNeighbors
 
 # Creamos una función para filtrar del texto que ingresemos los signos de puntuación y los stopwords, y para pasar todo a minúsculas.
 nltk.download('stopwords') # Descargamos el conjunto de stopwords en inglés
@@ -28,22 +28,26 @@ DATASET = "Dataset/data_merge.csv"
 data = pd.read_csv(DATASET)
 
 # Reducimos el número de registros para evitar que se muera el computador
-data_reduced = data[data["vote_count"] > 100]
+data_reduced = data[data["vote_count"] > 50]
 data_reduced = data_reduced[data_reduced["vote_average"] > 5]
-data_reduced.dropna(subset=["overview", "title"], inplace=True)
+data_reduced.dropna(subset=["title", "genres", "director", "production_companies"], inplace=True)
 #----------------------------------------------------------------------
 
-# Aplicamos la función de filtrado de texto a overview y title y las concateno en una sola columna.
-data_reduced["overview_main_words"] = data_reduced["overview"].apply(lambda x: transform_sentence(x) if pd.notnull(x) else np.nan)
+# Aplicamos la función de filtrado de texto a title, genres, director y production_companies, y las concateno en una sola columna.
 data_reduced["title_main_words"] = data_reduced["title"].apply(lambda x: transform_sentence(x) if pd.notnull(x) else np.nan)
-data_reduced["main_words_for_rs"] = data_reduced["title_main_words"] + " " + data_reduced["overview_main_words"]
-data_reduced.drop(columns=["overview_main_words", "title_main_words"], inplace=True)
+data_reduced["genres_main_words"] = data_reduced["genres"].apply(lambda x: transform_sentence(' '.join(x)) if pd.notnull(' '.join(x)) else np.nan)
+data_reduced["director_main_words"] = data_reduced["director"].apply(lambda x: transform_sentence(' '.join(x)) if pd.notnull(' '.join(x)) else np.nan)
+data_reduced["company_main_words"] = data_reduced["production_companies"].apply(lambda x: transform_sentence(' '.join(x)) if pd.notnull(' '.join(x)) else np.nan)
+data_reduced["main_words_for_rs"] = data_reduced["title_main_words"] + " " + data_reduced["genres_main_words"] + " " + data_reduced["director_main_words"] + " " + data_reduced["company_main_words"]
+data_reduced.drop(columns=["title_main_words", "genres_main_words", "director_main_words", "company_main_words"], inplace=True)
+data_reduced.reset_index(drop=True, inplace=True)
 #----------------------------------------------------------------------
 
 # Creamos TF-IDF vectors y calculamos similaridad con Cosine Similarity
 vectorizer = TfidfVectorizer()
 tfidf_matrix = vectorizer.fit_transform(data_reduced["main_words_for_rs"])
-similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
+nn_model = NearestNeighbors(metric="cosine")
+nn_model.fit(tfidf_matrix)
 #----------------------------------------------------------------------
 
 app = FastAPI()
@@ -116,7 +120,10 @@ def get_director(Director: str):
 @app.get("/recommendation/{titulo}")
 def recomendacion(titulo: str): 
 # Se ingresa el nombre de una película y te recomienda las similares en una lista de 5 valores.
-    index_id = data_reduced[data_reduced["title"] == titulo].index[0]  # Index of the movie you want to find similar movies for
-    similar_movies_indices = similarity_matrix[index_id].argsort()[::-1][1:6]  # Exclude the movie itself, take top 10
-    similar_movies = data_reduced.iloc[similar_movies_indices][['title']].to_dict(orient='list')
-    return similar_movies
+    n = 5
+    index_id = data_reduced[data_reduced["title"] == titulo].index[0]
+    distances, neighbor_indices = nn_model.kneighbors(tfidf_matrix[index_id], n_neighbors=n+1)
+    neighbor_indices = neighbor_indices.flatten()
+
+    top_peliculas = data_reduced["title"].iloc[neighbor_indices[1:6]].tolist()
+    return {"title": top_peliculas}
