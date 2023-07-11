@@ -28,7 +28,7 @@ DATASET = "Dataset/data_merge.csv"
 data = pd.read_csv(DATASET)
 
 # Reducimos el número de registros para evitar que se muera el computador
-data_reduced = data[data["vote_count"] > 50]
+data_reduced = data[data["vote_count"] > 100]
 data_reduced = data_reduced[data_reduced["vote_average"] > 5]
 data_reduced.dropna(subset=["overview", "title"], inplace=True)
 #----------------------------------------------------------------------
